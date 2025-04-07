@@ -10,6 +10,7 @@ from src_code.step_02 import percentage_supplemental_required_method, plot_suppl
 def prepare_triangle_data(claim_df, value_col='paid_losses'):
     """
     Convert the claim data to a format suitable for chainladder triangle.
+    This approach formats development periods correctly for chainladder.
 
     Parameters:
     - claim_df: DataFrame with claim data
@@ -27,7 +28,7 @@ def prepare_triangle_data(claim_df, value_col='paid_losses'):
     clean_df['accident_year'] = clean_df['accident_year'].astype(int)
     clean_df['dev_year'] = clean_df['dev_year'].astype(int)
 
-    # Pivot into triangle format
+    # Pivot into triangle format (for display only)
     triangle_df = clean_df.pivot_table(
         index='accident_year',
         columns='dev_year',
@@ -35,41 +36,76 @@ def prepare_triangle_data(claim_df, value_col='paid_losses'):
         aggfunc='sum'
     )
 
-    # Ensure dev years are sorted left to right
-    triangle_df = triangle_df.sort_index(axis=1)
-
-    # Enforce lower triangle: mask out future dev periods
-    n = len(triangle_df)
-    for i, ay in enumerate(triangle_df.index):
-        max_dev = n - i - 1
-        triangle_df.loc[ay, triangle_df.columns > max_dev] = np.nan
-
-    # Drop any completely empty columns
-    triangle_df = triangle_df.dropna(axis=1, how='all')
-
     print(f"Pivoted triangle for {value_col}:")
     print(triangle_df)
 
     try:
-        # Convert to masked array (chainladder expects a 2D masked array)
-        triangle_ma = np.ma.masked_invalid(triangle_df.to_numpy())
+        # Convert development periods to proper development lags
+        # Format the development periods as '{development period}M' to indicate months
+        # This helps chainladder correctly interpret the development lags
+        dev_periods = {i: f"{i * 12}M" for i in triangle_df.columns}
+        formatted_df = triangle_df.rename(columns=dev_periods)
 
+        # Create triangle using chainladder's DataFrame constructor
         triangle = cl.Triangle(
-            triangle_ma,
-            origin=triangle_df.index.values,
-            development=triangle_df.columns.values
+            data=formatted_df,
+            origin='index',
+            development='columns',
+            format='%Y'  # Format for origin period (year)
         )
         return triangle
 
     except Exception as e:
         print(f"Error creating triangle for {value_col}: {e}")
-        print("Triangle DataFrame info:")
-        print(triangle_df.info())
-        print("Triangle DataFrame dtypes:")
-        print(triangle_df.dtypes)
-        print("DataFrame column values:")
-        print(triangle_df.columns.tolist())
-        return None
+
+        # Try alternative approach using from_pandas
+        try:
+            # Try the from_pandas approach
+            triangle = cl.Triangle.from_pandas(
+                triangle_df,
+                origin_format="%Y",  # Format for accident years
+                development_format="%d"  # Format for development periods as integers
+            )
+            return triangle
+
+        except Exception as e2:
+            print(f"Alternative approach also failed: {e2}")
+
+            # Try one more approach using the long format
+            try:
+                # Prepare data in long format with properly formatted development periods
+                cl_input_df = clean_df[['accident_year', 'dev_year', value_col]].copy()
+
+                # Format development periods as developmentlag in months
+                cl_input_df['development'] = cl_input_df['dev_year'].apply(lambda x: f"{x * 12}M")
+
+                # Create the final input DataFrame
+                final_df = pd.DataFrame({
+                    'origin': cl_input_df['accident_year'],
+                    'development': cl_input_df['development'],
+                    'values': cl_input_df[value_col]
+                })
+
+                # Create triangle from the long format
+                triangle = cl.Triangle(
+                    data=final_df,
+                    origin='origin',
+                    development='development',
+                    columns='values',
+                    format='%Y'  # Format for origin period
+                )
+                return triangle
+
+            except Exception as e3:
+                print(f"Third approach also failed: {e3}")
+
+                print("Triangle DataFrame info:")
+                print(triangle_df.info())
+                print("Triangle DataFrame dtypes:")
+                print(triangle_df.dtypes)
+                print("DataFrame column values:")
+                print(triangle_df.columns.tolist())
+                return None
 
 
 def run_chainladder_method(triangle, method_type='paid'):
