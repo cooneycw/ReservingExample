@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 def generate_claim_data(
         accident_years_range=(2017, 2024),  # Range of accident years
-        dev_years=8,  # Maximum development years
+        dev_years=9,  # Maximum development years
         claim_inflation=0.05,  # Annual claim inflation rate
         payment_patterns=None,  # Custom payment patterns by development year
         case_reserve_patterns=None,  # Custom case reserve patterns
@@ -208,5 +208,3 @@ def plot_development_patterns(claim_df, metric='paid_losses', by='accident_year'
     plt.legend()
     plt.show()
 
-
-# Example usage:
