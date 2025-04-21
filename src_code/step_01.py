@@ -24,7 +24,8 @@ def generate_claim_data(
         loss_ratio_std=0.08,  # Standard deviation of loss ratio
         premium_base=1000000,  # Base premium amount
         premium_growth=0.03,  # Annual premium growth rate
-        random_seed=42  # Random seed for reproducibility
+        random_seed=42,  # Random seed for reproducibility
+        dev_year_offset=12  # New parameter to offset development years
 ):
     """
     Generate synthetic insurance claim data for reserving analysis.
@@ -48,16 +49,16 @@ def generate_claim_data(
         # Creating a realistic payment pattern (cumulative %)
         # For long-tail business, claims develop over several years
         payment_patterns = {
-            0: 0.30,  # 30% paid in the first year
-            1: 0.60,  # 60% paid by end of second year
-            2: 0.75,
-            3: 0.85,
-            4: 0.90,
-            5: 0.93,
-            6: 0.96,
-            7: 0.98,
-            8: 0.99,
-            9: 1.00  # Fully paid by year 10
+            dev_year_offset + 0: 0.30,  # 30% paid in the first year
+            dev_year_offset + 1: 0.60,  # 60% paid by end of second year
+            dev_year_offset + 2: 0.75,
+            dev_year_offset + 3: 0.85,
+            dev_year_offset + 4: 0.90,
+            dev_year_offset + 5: 0.93,
+            dev_year_offset + 6: 0.96,
+            dev_year_offset + 7: 0.98,
+            dev_year_offset + 8: 0.99,
+            dev_year_offset + 9: 1.00  # Fully paid by year 10
         }
 
     # Set up default case reserve patterns if not provided
@@ -65,16 +66,16 @@ def generate_claim_data(
         # Case reserves as % of ultimate by development year
         # Initially high, then decreases as claims are paid
         case_reserve_patterns = {
-            0: 0.50,  # Initially, 50% of ultimate is set as case reserves
-            1: 0.35,  # After 1 year, 35% of ultimate remains as case reserves
-            2: 0.23,
-            3: 0.14,
-            4: 0.09,
-            5: 0.06,
-            6: 0.03,
-            7: 0.02,
-            8: 0.01,
-            9: 0.00  # No case reserves by year 10
+            dev_year_offset + 0: 0.50,  # Initially, 50% of ultimate is set as case reserves
+            dev_year_offset + 1: 0.35,  # After 1 year, 35% of ultimate remains as case reserves
+            dev_year_offset + 2: 0.23,
+            dev_year_offset + 3: 0.14,
+            dev_year_offset + 4: 0.09,
+            dev_year_offset + 5: 0.06,
+            dev_year_offset + 6: 0.03,
+            dev_year_offset + 7: 0.02,
+            dev_year_offset + 8: 0.01,
+            dev_year_offset + 9: 0.00  # No case reserves by year 10
         }
 
     # Set up default IBNR patterns if not provided
@@ -82,16 +83,16 @@ def generate_claim_data(
         # IBNR as % of ultimate by development year
         # Initially high, then decreases as claims are reported and developed
         ibnr_patterns = {
-            0: 0.20,  # 20% of ultimate is IBNR in first year
-            1: 0.05,  # 5% of ultimate is IBNR after 1 year
-            2: 0.02,
-            3: 0.01,
-            4: 0.01,
-            5: 0.01,
-            6: 0.01,
-            7: 0.00,
-            8: 0.00,
-            9: 0.00  # No IBNR by year 10
+            dev_year_offset + 0: 0.20,  # 20% of ultimate is IBNR in first year
+            dev_year_offset + 1: 0.05,  # 5% of ultimate is IBNR after 1 year
+            dev_year_offset + 2: 0.02,
+            dev_year_offset + 3: 0.01,
+            dev_year_offset + 4: 0.01,
+            dev_year_offset + 5: 0.01,
+            dev_year_offset + 6: 0.01,
+            dev_year_offset + 7: 0.00,
+            dev_year_offset + 8: 0.00,
+            dev_year_offset + 9: 0.00  # No IBNR by year 10
         }
 
     # Generate earned premiums with growth and random fluctuation
@@ -139,12 +140,13 @@ def generate_claim_data(
         ultimate_loss = ultimates[ay]
 
         # Loop through all possible development years up to the maximum
-        for dev_year in range(min(dev_years, datetime.now().year - ay + 1)):
+        for dev in range(min(dev_years, datetime.now().year - ay + 1)):
             # Calendar year is accident year + development year
-            cy = ay + dev_year
+            cy = ay + dev
 
             # Calculate paid losses based on payment pattern and ultimate loss
-            paid_percent = payment_patterns.get(dev_year, 1.0)  # Default to 100% if beyond pattern
+            dev_with_offset = dev + dev_year_offset
+            paid_percent = payment_patterns.get(dev_with_offset, 1.0)  # Default to 100% if beyond pattern
             paid_loss = ultimate_loss * paid_percent
 
             # Add some random variation to paid amounts (±3%)
@@ -152,7 +154,7 @@ def generate_claim_data(
             paid_loss *= paid_random_factor
 
             # Calculate case reserves based on pattern
-            case_percent = case_reserve_patterns.get(dev_year, 0.0)
+            case_percent = case_reserve_patterns.get(dev_with_offset, 0.0)
             case_reserve = ultimate_loss * case_percent
 
             # Add some random variation to case reserves (±10%)
@@ -160,7 +162,7 @@ def generate_claim_data(
             case_reserve *= case_random_factor
 
             # Calculate IBNR (actuary's estimate of IBNR, not actual)
-            ibnr_percent = ibnr_patterns.get(dev_year, 0.0)
+            ibnr_percent = ibnr_patterns.get(dev_with_offset, 0.0)
             aa_ibnr = ultimate_loss * ibnr_percent
 
             # Add some random variation to IBNR (±15%)
@@ -174,7 +176,7 @@ def generate_claim_data(
             row = {
                 'accident_year': ay,
                 'calendar_year': cy,
-                'dev_year': dev_year,
+                'dev_year': dev_with_offset,  # Use the offset development year
                 'paid_losses': round(paid_loss, 2),
                 'case_reserves': round(case_reserve, 2),
                 'incd_losses': round(incd_loss, 2),
@@ -215,4 +217,3 @@ def plot_development_patterns(claim_df, metric='paid_losses', by='accident_year'
     plt.grid(True)
     plt.legend()
     plt.show()
-
