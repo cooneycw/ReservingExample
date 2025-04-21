@@ -8,7 +8,7 @@ pd.set_option('display.width', 1000)
 # Increase column width for text columns if needed
 pd.set_option('display.max_colwidth', 100)
 from src_code.step_01 import generate_claim_data, plot_development_patterns
-from src_code.step_02 import import_triangle
+from src_code.step_02 import import_triangle, analyze_triangle
 
 
 def main():
@@ -23,6 +23,7 @@ def main():
     plot_development_patterns(claim_df, metric='paid_losses')
     plot_development_patterns(claim_df, metric='incd_losses')
     triangle = import_triangle(claim_df, premium_df)
+    analyze_triangle(triangle)
 
 if __name__ == "__main__":
     main()
