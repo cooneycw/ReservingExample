@@ -59,7 +59,7 @@ def calculate_aa_ultimates(claim_df: pd.DataFrame):
 
 def analyze_triangle(triangle: cl.Triangle, triangle_type='paid', aa_ultimates=None):
     """
-    Performs various reserving analyses and plots development.
+    Performs basic chainladder analysis.
     """
     print(f"\n--- {triangle_type.capitalize()} Triangle Analysis ---")
     print(f"\nTriangle Data (Original):")
